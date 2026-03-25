@@ -123,6 +123,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); min-
 <div class="header">
   <h1>BK Study Hub</h1>
   <div class="subtitle" id="headerDate"></div>
+  <div style="font-size:10px;color:var(--green);margin-top:2px;" id="syncIndicator">Loading...</div>
 </div>
 
 <!-- Views -->
@@ -214,17 +215,29 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); min-
 
 <script>
 // ========= DATA =========
-const assignments = [
-  { name: "IWA Revision Plan", course: "AP Seminar", due: "2026-03-25T03:59:59Z", points: 10, url: "https://bishopkenny.instructure.com/courses/2506/assignments/242655" },
-  { name: "IMP Planning Sheet", course: "AP Seminar", due: "2026-03-26T03:59:59Z", points: 10, url: "https://bishopkenny.instructure.com/courses/2506/assignments/218957" },
-  { name: "Ch.15 Exercises 27-31, 43, 49, 51, 77, 81", course: "AP Chemistry", due: "2026-03-26T03:59:59Z", points: 5, url: "https://bishopkenny.instructure.com/courses/2604" },
-  { name: "4.4-4.7 Test MCQ", course: "AP Psychology", due: "2026-03-26T19:00:00Z", points: 100, url: "https://bishopkenny.instructure.com/courses/2564/assignments/243081" },
-  { name: "Time Period 1&2 MCQ 55", course: "AP US History", due: "2026-03-28T03:59:59Z", points: 100, url: "https://bishopkenny.instructure.com/courses/2553/assignments/242843" },
-  { name: "First Draft IMP Slides", course: "AP Seminar", due: "2026-03-30T12:00:00Z", points: 20, url: "https://bishopkenny.instructure.com/courses/2506/assignments/218954" },
-  { name: "MCQ Quiz 11", course: "AP English Language", due: "2026-03-30T19:00:00Z", points: 50, url: "https://bishopkenny.instructure.com/courses/2514/assignments/242877" },
-  { name: "4.4-4.7 Test EBQ", course: "AP Psychology", due: "2026-03-31T19:00:00Z", points: 100, url: "https://bishopkenny.instructure.com/courses/2564/assignments/243082" },
-  { name: "IWA Revision & Review 2", course: "AP Seminar", due: "2026-04-04T03:59:59Z", points: 30, url: "https://bishopkenny.instructure.com/courses/2506/assignments/242656" }
-];
+let assignments = JSON.parse(localStorage.getItem('sh_assignments') || '[]');
+let lastFetch = localStorage.getItem('sh_lastfetch') || '';
+
+async function fetchAssignments() {
+  try {
+    const indicator = document.getElementById('syncIndicator');
+    if (indicator) indicator.textContent = 'Syncing...';
+    const res = await fetch('/api/assignments');
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    assignments = data.assignments;
+    localStorage.setItem('sh_assignments', JSON.stringify(assignments));
+    localStorage.setItem('sh_lastfetch', data.lastUpdated);
+    lastFetch = data.lastUpdated;
+    if (indicator) indicator.textContent = `Updated ${new Date(lastFetch).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'})}`;
+    renderPlanner();
+    initTimer();
+  } catch (e) {
+    console.warn('Fetch failed, using cached data:', e);
+    const indicator = document.getElementById('syncIndicator');
+    if (indicator) indicator.textContent = assignments.length ? 'Using cached data' : 'No data - check connection';
+  }
+}
 
 const schedule = [
   { time: "7:30", end: "8:20", title: "Period 1", type: "class" },
@@ -502,8 +515,12 @@ function switchView(view, el) {
 }
 
 // ========= INIT =========
-renderPlanner();
-initTimer();
+// Render cached data immediately, then fetch fresh
+if (assignments.length) {
+  renderPlanner();
+  initTimer();
+}
+fetchAssignments();
 
 // Request notification permission
 if ('Notification' in window && Notification.permission === 'default') {
@@ -515,8 +532,9 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
 }
 
-// Refresh planner every minute
+// Refresh planner every minute, re-fetch from Canvas every 30 min
 setInterval(renderPlanner, 60000);
+setInterval(fetchAssignments, 30 * 60 * 1000);
 </script>
 </body>
 </html>
