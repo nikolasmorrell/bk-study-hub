@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f172a">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>BK Study Hub</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0f172a; --surface: #1e293b; --card: #334155;
+  --text: #f1f5f9; --muted: #94a3b8; --accent: #3b82f6;
+  --red: #ef4444; --orange: #f97316; --yellow: #eab308; --green: #22c55e;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100dvh; overflow-x: hidden; padding-bottom: 80px; }
+.header { padding: 16px 20px 12px; background: var(--surface); border-bottom: 1px solid rgba(255,255,255,0.05); position: sticky; top: 0; z-index: 100; }
+.header h1 { font-size: 20px; font-weight: 700; }
+.header .subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 0; background: var(--surface); padding: 0 16px 12px; position: sticky; top: 58px; z-index: 99; }
+.tab { flex: 1; padding: 10px; text-align: center; font-size: 13px; font-weight: 600; border: none; background: var(--card); color: var(--muted); cursor: pointer; transition: all 0.2s; }
+.tab:first-child { border-radius: 10px 0 0 10px; }
+.tab:last-child { border-radius: 0 10px 10px 0; }
+.tab.active { background: var(--accent); color: white; }
+.view { display: none; padding: 16px; }
+.view.active { display: block; }
+
+/* Study Planner */
+.date-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.date-nav button { background: var(--card); border: none; color: var(--text); width: 36px; height: 36px; border-radius: 50%; font-size: 18px; cursor: pointer; }
+.date-nav .date-label { font-size: 15px; font-weight: 600; }
+.timeline { position: relative; }
+.time-block { display: flex; margin-bottom: 2px; min-height: 52px; }
+.time-label { width: 52px; font-size: 11px; color: var(--muted); padding-top: 4px; flex-shrink: 0; text-align: right; padding-right: 10px; }
+.block-content { flex: 1; border-radius: 10px; padding: 10px 14px; font-size: 13px; position: relative; }
+.block-content .block-title { font-weight: 600; font-size: 13px; }
+.block-content .block-sub { font-size: 11px; opacity: 0.8; margin-top: 2px; }
+.block-free { background: rgba(255,255,255,0.03); border: 1px dashed rgba(255,255,255,0.08); }
+.block-study { background: rgba(59,130,246,0.15); border-left: 3px solid var(--accent); }
+.block-class { background: rgba(139,92,246,0.15); border-left: 3px solid #8b5cf6; }
+.block-swim { background: rgba(34,197,94,0.15); border-left: 3px solid var(--green); }
+.block-urgent { background: rgba(239,68,68,0.15); border-left: 3px solid var(--red); }
+.block-break { background: rgba(255,255,255,0.03); border-left: 3px solid var(--muted); }
+
+.up-next { background: linear-gradient(135deg, var(--accent), #6366f1); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+.up-next .label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8; }
+.up-next .title { font-size: 18px; font-weight: 700; margin-top: 4px; }
+.up-next .meta { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+
+.assignment-list { margin-top: 16px; }
+.assignment-card { background: var(--surface); border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+.urgency-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.urgency-dot.red { background: var(--red); box-shadow: 0 0 8px var(--red); }
+.urgency-dot.orange { background: var(--orange); box-shadow: 0 0 8px var(--orange); }
+.urgency-dot.yellow { background: var(--yellow); }
+.urgency-dot.green { background: var(--green); }
+.assignment-info { flex: 1; min-width: 0; }
+.assignment-info .name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.assignment-info .course { font-size: 11px; color: var(--muted); }
+.assignment-due { text-align: right; flex-shrink: 0; }
+.assignment-due .time { font-size: 13px; font-weight: 600; }
+.assignment-due .date { font-size: 11px; color: var(--muted); }
+
+/* Timer */
+.timer-container { display: flex; flex-direction: column; align-items: center; padding-top: 20px; }
+.timer-ring { position: relative; width: 260px; height: 260px; }
+.timer-ring svg { transform: rotate(-90deg); }
+.timer-ring circle { fill: none; stroke-width: 6; }
+.timer-ring .bg { stroke: var(--card); }
+.timer-ring .progress { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 0.5s; }
+.timer-ring.break-mode .progress { stroke: var(--green); }
+.timer-display { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+.timer-display .time { font-size: 56px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -2px; }
+.timer-display .mode-label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; }
+
+.timer-controls { display: flex; gap: 12px; margin-top: 28px; }
+.timer-btn { width: 56px; height: 56px; border-radius: 50%; border: none; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; }
+.timer-btn:active { transform: scale(0.92); }
+.timer-btn.primary { background: var(--accent); color: white; width: 68px; height: 68px; font-size: 24px; }
+.timer-btn.secondary { background: var(--card); color: var(--text); }
+.timer-btn.danger { background: rgba(239,68,68,0.2); color: var(--red); }
+
+.timer-assignment { background: var(--surface); border-radius: 14px; padding: 16px; margin-top: 24px; width: 100%; }
+.timer-assignment .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.timer-assignment select { width: 100%; background: var(--card); color: var(--text); border: none; border-radius: 8px; padding: 10px 12px; font-size: 14px; margin-top: 8px; font-family: var(--font); }
+.timer-assignment select option { background: var(--card); }
+
+.preset-btns { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; justify-content: center; }
+.preset-btn { padding: 8px 16px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; font-family: var(--font); }
+.preset-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+.stats-row { display: flex; gap: 8px; margin-top: 20px; width: 100%; }
+.stat-card { flex: 1; background: var(--surface); border-radius: 12px; padding: 12px; text-align: center; }
+.stat-card .stat-val { font-size: 22px; font-weight: 700; }
+.stat-card .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+
+.session-log { margin-top: 16px; width: 100%; }
+.session-log h3 { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.log-entry { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; }
+.log-entry .log-name { font-weight: 500; }
+.log-entry .log-time { color: var(--muted); }
+
+/* Bottom nav */
+.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid rgba(255,255,255,0.05); display: flex; padding: 8px 0; padding-bottom: max(8px, env(safe-area-inset-bottom)); z-index: 100; }
+.nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; cursor: pointer; color: var(--muted); transition: color 0.2s; border: none; background: none; font-family: var(--font); }
+.nav-item.active { color: var(--accent); }
+.nav-item svg { width: 22px; height: 22px; }
+.nav-item span { font-size: 10px; font-weight: 600; }
+
+@media (prefers-color-scheme: light) {
+  :root { --bg: #f8fafc; --surface: #ffffff; --card: #f1f5f9; --text: #0f172a; --muted: #64748b; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>BK Study Hub</h1>
+  <div class="subtitle" id="headerDate"></div>
+</div>
+
+<!-- Views -->
+<div id="planner-view" class="view active">
+  <div class="up-next" id="upNext">
+    <div class="label">Up Next</div>
+    <div class="title" id="upNextTitle">Loading...</div>
+    <div class="meta" id="upNextMeta"></div>
+  </div>
+
+  <h3 style="font-size:14px;margin-bottom:12px;">Assignments</h3>
+  <div class="assignment-list" id="assignmentList"></div>
+
+  <h3 style="font-size:14px;margin:20px 0 12px;">Today's Schedule</h3>
+  <div class="timeline" id="timeline"></div>
+</div>
+
+<div id="timer-view" class="view">
+  <div class="timer-container">
+    <div class="timer-ring" id="timerRing">
+      <svg width="260" height="260" viewBox="0 0 260 260">
+        <circle class="bg" cx="130" cy="130" r="120"/>
+        <circle class="progress" id="timerProgress" cx="130" cy="130" r="120"
+          stroke-dasharray="754" stroke-dashoffset="0"/>
+      </svg>
+      <div class="timer-display">
+        <div class="time" id="timerTime">25:00</div>
+        <div class="mode-label" id="timerMode">Focus</div>
+      </div>
+    </div>
+
+    <div class="timer-controls">
+      <button class="timer-btn secondary" onclick="resetTimer()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+      </button>
+      <button class="timer-btn primary" id="timerPlayBtn" onclick="toggleTimer()">
+        <svg id="playIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg>
+        <svg id="pauseIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="5" y="3" width="5" height="18"/><rect x="14" y="3" width="5" height="18"/></svg>
+      </button>
+      <button class="timer-btn secondary" onclick="skipTimer()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 15,12 5,21"/><rect x="16" y="3" width="3" height="18"/></svg>
+      </button>
+    </div>
+
+    <div class="preset-btns">
+      <button class="preset-btn active" onclick="setPreset(25, this)">25 min</button>
+      <button class="preset-btn" onclick="setPreset(30, this)">30 min</button>
+      <button class="preset-btn" onclick="setPreset(45, this)">45 min</button>
+      <button class="preset-btn" onclick="setPreset(50, this)">50 min</button>
+    </div>
+
+    <div class="timer-assignment">
+      <div class="label">Studying for</div>
+      <select id="timerSelect"></select>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-val" id="statSessions">0</div>
+        <div class="stat-label">Sessions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="statMinutes">0</div>
+        <div class="stat-label">Minutes</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" id="statStreak">0</div>
+        <div class="stat-label">Streak</div>
+      </div>
+    </div>
+
+    <div class="session-log" id="sessionLog">
+      <h3>Today's Sessions</h3>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+  <button class="nav-item active" onclick="switchView('planner', this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <span>Planner</span>
+  </button>
+  <button class="nav-item" onclick="switchView('timer', this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+    <span>Timer</span>
+  </button>
+</div>
+
+<script>
+// ========= DATA =========
+const assignments = [
+  { name: "IWA Revision Plan", course: "AP Seminar", due: "2026-03-25T03:59:59Z", points: 10, url: "https://bishopkenny.instructure.com/courses/2506/assignments/242655" },
+  { name: "IMP Planning Sheet", course: "AP Seminar", due: "2026-03-26T03:59:59Z", points: 10, url: "https://bishopkenny.instructure.com/courses/2506/assignments/218957" },
+  { name: "Ch.15 Exercises 27-31, 43, 49, 51, 77, 81", course: "AP Chemistry", due: "2026-03-26T03:59:59Z", points: 5, url: "https://bishopkenny.instructure.com/courses/2604" },
+  { name: "4.4-4.7 Test MCQ", course: "AP Psychology", due: "2026-03-26T19:00:00Z", points: 100, url: "https://bishopkenny.instructure.com/courses/2564/assignments/243081" },
+  { name: "Time Period 1&2 MCQ 55", course: "AP US History", due: "2026-03-28T03:59:59Z", points: 100, url: "https://bishopkenny.instructure.com/courses/2553/assignments/242843" },
+  { name: "First Draft IMP Slides", course: "AP Seminar", due: "2026-03-30T12:00:00Z", points: 20, url: "https://bishopkenny.instructure.com/courses/2506/assignments/218954" },
+  { name: "MCQ Quiz 11", course: "AP English Language", due: "2026-03-30T19:00:00Z", points: 50, url: "https://bishopkenny.instructure.com/courses/2514/assignments/242877" },
+  { name: "4.4-4.7 Test EBQ", course: "AP Psychology", due: "2026-03-31T19:00:00Z", points: 100, url: "https://bishopkenny.instructure.com/courses/2564/assignments/243082" },
+  { name: "IWA Revision & Review 2", course: "AP Seminar", due: "2026-04-04T03:59:59Z", points: 30, url: "https://bishopkenny.instructure.com/courses/2506/assignments/242656" }
+];
+
+const schedule = [
+  { time: "7:30", end: "8:20", title: "Period 1", type: "class" },
+  { time: "8:25", end: "9:15", title: "Period 2", type: "class" },
+  { time: "9:20", end: "10:10", title: "Period 3", type: "class" },
+  { time: "10:15", end: "11:05", title: "Period 4", type: "class" },
+  { time: "11:10", end: "11:40", title: "Lunch", type: "break" },
+  { time: "11:45", end: "12:35", title: "Period 5", type: "class" },
+  { time: "12:40", end: "13:30", title: "Period 6", type: "class" },
+  { time: "13:35", end: "14:25", title: "Period 7", type: "class" },
+  { time: "14:30", end: "15:15", title: "Period 8", type: "class" },
+  { time: "17:00", end: "19:30", title: "Swim Practice", type: "swim" }
+];
+
+// ========= PLANNER =========
+function getUrgency(due) {
+  const h = (new Date(due) - new Date()) / 36e5;
+  if (h < 0) return { level: 'past', color: 'var(--muted)', dot: 'green', label: 'Done' };
+  if (h <= 48) return { level: 'urgent', color: 'var(--red)', dot: 'red', label: 'URGENT' };
+  if (h <= 120) return { level: 'soon', color: 'var(--orange)', dot: 'orange', label: 'Soon' };
+  return { level: 'upcoming', color: 'var(--yellow)', dot: 'yellow', label: 'Upcoming' };
+}
+
+function timeUntil(due) {
+  const diff = new Date(due) - new Date();
+  if (diff < 0) return 'Past due';
+  const h = Math.floor(diff / 36e5);
+  const d = Math.floor(h / 24);
+  if (d > 0) return `${d}d ${h % 24}h`;
+  const m = Math.floor((diff % 36e5) / 6e4);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function formatDue(due) {
+  const d = new Date(due);
+  const opts = { weekday: 'short', month: 'short', day: 'numeric' };
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return { date: d.toLocaleDateString('en-US', opts), time };
+}
+
+function renderPlanner() {
+  const now = new Date();
+  document.getElementById('headerDate').textContent = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  // Sort by due date
+  const sorted = [...assignments].sort((a, b) => new Date(a.due) - new Date(b.due));
+  const upcoming = sorted.filter(a => new Date(a.due) > now);
+
+  // Up next
+  if (upcoming.length > 0) {
+    const next = upcoming[0];
+    const urg = getUrgency(next.due);
+    document.getElementById('upNextTitle').textContent = next.name;
+    document.getElementById('upNextMeta').textContent = `${next.course} \u2022 Due in ${timeUntil(next.due)} \u2022 ${next.points} pts`;
+  }
+
+  // Assignment list
+  const list = document.getElementById('assignmentList');
+  list.innerHTML = upcoming.map(a => {
+    const urg = getUrgency(a.due);
+    const f = formatDue(a.due);
+    return `<div class="assignment-card" onclick="window.open('${a.url}','_blank')">
+      <div class="urgency-dot ${urg.dot}"></div>
+      <div class="assignment-info">
+        <div class="name">${a.name}</div>
+        <div class="course">${a.course} \u2022 ${a.points} pts</div>
+      </div>
+      <div class="assignment-due">
+        <div class="time">${timeUntil(a.due)}</div>
+        <div class="date">${f.date}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Timeline
+  const tl = document.getElementById('timeline');
+  const blocks = [];
+
+  // Add study blocks in free time
+  const allBlocks = [...schedule];
+
+  // Study suggestions: 3:30-4:45 and 8:00-10:00
+  const studyFor = upcoming.length > 0 ? upcoming[0] : null;
+  if (studyFor) {
+    allBlocks.push({ time: "15:30", end: "16:45", title: `Study: ${studyFor.name}`, sub: studyFor.course, type: "study" });
+    allBlocks.push({ time: "20:00", end: "21:30", title: `Study: ${upcoming.length > 1 ? upcoming[1].name : studyFor.name}`, sub: upcoming.length > 1 ? upcoming[1].course : studyFor.course, type: "study" });
+    if (upcoming.length > 2) {
+      allBlocks.push({ time: "21:30", end: "22:30", title: `Study: ${upcoming[2].name}`, sub: upcoming[2].course, type: "study" });
+    }
+  }
+
+  allBlocks.sort((a, b) => toMin(a.time) - toMin(b.time));
+
+  tl.innerHTML = allBlocks.map(b => {
+    const cls = b.type === 'study' ? 'block-study' : b.type === 'swim' ? 'block-swim' : b.type === 'break' ? 'block-break' : 'block-class';
+    const icon = b.type === 'study' ? '\ud83d\udcda ' : b.type === 'swim' ? '\ud83c\udfca ' : b.type === 'break' ? '\u2615 ' : '';
+    return `<div class="time-block">
+      <div class="time-label">${to12(b.time)}</div>
+      <div class="block-content ${cls}">
+        <div class="block-title">${icon}${b.title}</div>
+        <div class="block-sub">${b.sub || ''} ${to12(b.time)} - ${to12(b.end)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toMin(t) { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
+function to12(t) { const [h, m] = t.split(':').map(Number); const ampm = h >= 12 ? 'PM' : 'AM'; const h12 = h % 12 || 12; return m ? `${h12}:${String(m).padStart(2,'0')} ${ampm}` : `${h12} ${ampm}`; }
+
+// ========= TIMER =========
+let timerSeconds = 25 * 60;
+let timerTotal = 25 * 60;
+let timerRunning = false;
+let timerInterval = null;
+let isBreak = false;
+let sessions = JSON.parse(localStorage.getItem('sh_sessions') || '0');
+let totalMinutes = JSON.parse(localStorage.getItem('sh_minutes') || '0');
+let streak = JSON.parse(localStorage.getItem('sh_streak') || '0');
+let todayLogs = JSON.parse(localStorage.getItem('sh_logs') || '[]');
+
+// Check if logs are from today
+const logDate = localStorage.getItem('sh_logdate');
+const today = new Date().toDateString();
+if (logDate !== today) {
+  todayLogs = [];
+  localStorage.setItem('sh_logs', '[]');
+  localStorage.setItem('sh_logdate', today);
+}
+
+function initTimer() {
+  const sel = document.getElementById('timerSelect');
+  const upcoming = assignments.filter(a => new Date(a.due) > new Date()).sort((a, b) => new Date(a.due) - new Date(b.due));
+  sel.innerHTML = upcoming.map((a, i) => {
+    const urg = getUrgency(a.due);
+    return `<option value="${i}">${a.name} - ${a.course} (${timeUntil(a.due)})</option>`;
+  }).join('');
+  updateTimerDisplay();
+  updateStats();
+  renderLogs();
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(timerSeconds / 60);
+  const s = timerSeconds % 60;
+  document.getElementById('timerTime').textContent = `${m}:${String(s).padStart(2, '0')}`;
+
+  const pct = 1 - (timerSeconds / timerTotal);
+  const circ = 754;
+  document.getElementById('timerProgress').style.strokeDashoffset = circ * (1 - pct);
+  document.getElementById('timerMode').textContent = isBreak ? 'Break' : 'Focus';
+
+  const ring = document.getElementById('timerRing');
+  ring.classList.toggle('break-mode', isBreak);
+}
+
+function toggleTimer() {
+  if (timerRunning) {
+    clearInterval(timerInterval);
+    timerRunning = false;
+  } else {
+    timerRunning = true;
+    timerInterval = setInterval(() => {
+      timerSeconds--;
+      if (timerSeconds <= 0) {
+        clearInterval(timerInterval);
+        timerRunning = false;
+        onTimerComplete();
+      }
+      updateTimerDisplay();
+      updatePlayBtn();
+    }, 1000);
+  }
+  updatePlayBtn();
+}
+
+function updatePlayBtn() {
+  document.getElementById('playIcon').style.display = timerRunning ? 'none' : 'block';
+  document.getElementById('pauseIcon').style.display = timerRunning ? 'block' : 'none';
+}
+
+function resetTimer() {
+  clearInterval(timerInterval);
+  timerRunning = false;
+  timerSeconds = timerTotal;
+  isBreak = false;
+  updateTimerDisplay();
+  updatePlayBtn();
+}
+
+function skipTimer() {
+  clearInterval(timerInterval);
+  timerRunning = false;
+  if (!isBreak) {
+    onTimerComplete();
+  } else {
+    isBreak = false;
+    timerSeconds = timerTotal;
+    updateTimerDisplay();
+    updatePlayBtn();
+  }
+}
+
+function onTimerComplete() {
+  if (!isBreak) {
+    sessions++;
+    totalMinutes += Math.round(timerTotal / 60);
+    streak++;
+    localStorage.setItem('sh_sessions', sessions);
+    localStorage.setItem('sh_minutes', totalMinutes);
+    localStorage.setItem('sh_streak', streak);
+
+    const sel = document.getElementById('timerSelect');
+    const name = sel.options[sel.selectedIndex]?.text || 'Study session';
+    todayLogs.push({ name: name.split(' - ')[0], mins: Math.round(timerTotal / 60), time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) });
+    localStorage.setItem('sh_logs', JSON.stringify(todayLogs));
+
+    updateStats();
+    renderLogs();
+
+    // Notify
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('\ud83c\udf89 Focus session complete!', { body: `${Math.round(timerTotal / 60)} min done. Take a break!`, icon: '/icon-192.png' });
+    }
+
+    // Switch to break
+    isBreak = true;
+    timerSeconds = 5 * 60;
+    timerTotal = 5 * 60;
+  } else {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('\ud83d\udcaa Break over!', { body: 'Time to focus again.', icon: '/icon-192.png' });
+    }
+    isBreak = false;
+    timerSeconds = 25 * 60;
+    timerTotal = 25 * 60;
+  }
+  updateTimerDisplay();
+  updatePlayBtn();
+}
+
+function setPreset(min, el) {
+  if (timerRunning) return;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  timerTotal = min * 60;
+  timerSeconds = timerTotal;
+  isBreak = false;
+  updateTimerDisplay();
+}
+
+function updateStats() {
+  document.getElementById('statSessions').textContent = sessions;
+  document.getElementById('statMinutes').textContent = totalMinutes;
+  document.getElementById('statStreak').textContent = streak;
+}
+
+function renderLogs() {
+  const container = document.getElementById('sessionLog');
+  if (todayLogs.length === 0) {
+    container.innerHTML = '<h3>Today\'s Sessions</h3><p style="color:var(--muted);font-size:13px;margin-top:8px;">No sessions yet. Start the timer!</p>';
+    return;
+  }
+  container.innerHTML = '<h3>Today\'s Sessions</h3>' + todayLogs.map(l =>
+    `<div class="log-entry"><span class="log-name">${l.name}</span><span class="log-time">${l.mins}m \u2022 ${l.time}</span></div>`
+  ).join('');
+}
+
+// ========= NAV =========
+function switchView(view, el) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(view + '-view').classList.add('active');
+  el.classList.add('active');
+}
+
+// ========= INIT =========
+renderPlanner();
+initTimer();
+
+// Request notification permission
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
+}
+
+// Refresh planner every minute
+setInterval(renderPlanner, 60000);
+</script>
+</body>
+</html>
